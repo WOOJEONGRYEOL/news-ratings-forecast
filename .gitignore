@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+logs/
+
+# 모델은 실행 시점에 학습한다 (97MB, 매 학습마다 새 blob 이 쌓인다)
+models/*.pkl
+
+# 시청률 원본은 저장소에 올리지 않는다 — 실행 시점에 구글 시트에서 받아온다
+data/종편_4사_메인_시청률.csv
+data/*.xlsx
+
+# 검증 리포트는 재생성 가능
+reports/*.csv
+data/events_candidates.csv
+
+# 시트 ID — 이것만 있으면 원본을 통째로 받을 수 있다
+data/sheet_id.txt
+.streamlit/secrets.toml
