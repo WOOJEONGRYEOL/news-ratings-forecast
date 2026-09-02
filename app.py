@@ -20,8 +20,8 @@ warnings.filterwarnings("ignore")
 from ratings import (backtest, data as rdata, forecast as rfc, kbo as rkbo,
                      model as rmodel)  # noqa: E402
 from ratings.config import (  # noqa: E402
-    CHANNELS, COLS_2049, DATA_DIR, HOUSEHOLD_COLS, MODEL_DIR, PALETTE,
-    RATINGS_CSV, REPORT_DIR,
+    CHANNELS, COLS_2049, DATA_DIR, DATE_COL, HOUSEHOLD_COLS, MODEL_DIR,
+    PALETTE, RATINGS_CSV, REPORT_DIR, TARGET_COLS,
 )
 from ratings.features import EVENT_TYPES, feature_columns  # noqa: E402
 from ratings.labels import (  # noqa: E402
@@ -45,10 +45,40 @@ def day_label(d, today) -> str:
 # --------------------------------------------------------------------------
 # 데이터 · 모델 로딩 (캐시)
 # --------------------------------------------------------------------------
+# data/ 에 함께 사는 내부 캐시들. 시청률 원본 후보로 잡히면 안 된다.
+INTERNAL_DATA = {"kbo_schedule.csv", "events.csv", "events_candidates.csv",
+                 "weather_observed.csv", "weather_leads.csv", "weather_future.csv",
+                 "sheet_id.txt"}
+
+
+def _looks_like_ratings(path: Path) -> bool:
+    """헤더만 읽어 시청률 원본인지 판별 (날짜 + 타깃 컬럼)."""
+    try:
+        for enc in ("utf-8-sig", "cp949", "euc-kr", "utf-8"):
+            try:
+                cols = pd.read_csv(path, nrows=0, encoding=enc).columns
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            return False
+    except Exception:                                  # noqa: BLE001
+        return False
+    cols = {str(c).strip() for c in cols}
+    return DATE_COL in cols and len(cols & set(TARGET_COLS)) >= 4
+
+
 def _candidate_files() -> list[Path]:
+    """시청률 원본으로 쓸 수 있는 파일만 고른다.
+
+    이름만으로 거르면 부족하다 — 저장소에 events.csv, weather_*.csv 같은 내부
+    캐시가 함께 있어서, 예전에는 그걸 시청률로 읽으려다 KeyError 가 났다.
+    헤더를 실제로 열어 날짜·타깃 컬럼이 있는지 확인한다.
+    """
     files = [RATINGS_CSV] if RATINGS_CSV.exists() else []
-    files += sorted(p for p in DATA_DIR.glob("*.csv")
-                    if p != RATINGS_CSV and p.name != "kbo_schedule.csv")
+    others = [p for p in sorted(DATA_DIR.glob("*.csv"))
+              if p != RATINGS_CSV and p.name not in INTERNAL_DATA]
+    files += [p for p in others if _looks_like_ratings(p)]
     files += sorted(DATA_DIR.glob("*.xlsx"))
     return files
 
@@ -170,7 +200,7 @@ def load_backtest(path: str, mtime: float, n_folds: int, horizon: int) -> pd.Dat
 # 사이드바
 # --------------------------------------------------------------------------
 files = _candidate_files()
-if not files:
+if not RATINGS_CSV.exists() and not files:
     # Streamlit Cloud 등 원본이 없는 환경: 시트에서 바로 받아온다.
     # 저장소에 시청률 CSV 를 올리지 않으므로 데이터가 git 히스토리에 남지 않는다.
     with st.spinner("구글 시트에서 시청률 데이터를 받아오는 중…"):
