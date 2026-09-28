@@ -26,7 +26,7 @@ BODY_TOP, BODY_BOT = (216, 220, 232), (150, 157, 178)   # 수상기 본체 (은�
 SCREEN = (13, 16, 32)                                    # 화면 바탕
 AMBER = (255, 196, 75)                                   # 화면 숫자 (앰버 CRT)
 BLUE = (96, 165, 250)                                    # 상승선
-MARK = AMBER                                             # 합성 기호 단색 (--color 로 변경)
+MARK = BLUE                                              # 합성 기호 단색 (--color 로 변경)
 
 FONT_BLACK = "/System/Library/Fonts/Supplemental/Arial Black.ttf"
 FONT_BOLD = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
@@ -216,7 +216,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--style", default="glyph", choices=["glyph", "side", "over"],
                     help="glyph=%% 사선이 화살표(기본), side=나란히, over=겹침")
-    ap.add_argument("--color", default="amber",
+    ap.add_argument("--color", default="blue",
                     choices=["amber", "blue", "white", "green"],
                     help="합성 기호 색 (style=glyph 일 때)")
     ap.add_argument("--preview", action="store_true", help="512 미리보기만 저장")
