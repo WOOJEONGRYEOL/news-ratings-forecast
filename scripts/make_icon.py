@@ -77,18 +77,57 @@ def _arrow(d: ImageDraw.ImageDraw, pts, color, width: int, head: int) -> None:
     d.polygon([tip, left, right], fill=color)
 
 
+def _pct_arrow(d: ImageDraw.ImageDraw, cx: int, cy: int, size: int,
+               ring_color, arrow_color) -> None:
+    """% 기호의 사선을 우상승 화살표로 바꾼 합성 기호.
+
+    화살표와 % 를 따로 두면 요소가 둘이라 작은 크기에서 서로를 방해한다.
+    % 의 사선이 원래 우상향(/)이므로, 그 자리에 화살촉만 얹으면
+    '퍼센트'와 '오른다'가 기호 하나로 읽힌다.
+    """
+    import math
+
+    # 고리를 사선에 바짝 붙여야 % 로 읽힌다. 떨어뜨리면 'O / O' 로 보인다.
+    a = size * 0.46                      # 사선 반길이
+    t = max(int(size * 0.125), 3)        # 사선 두께
+    r = size * 0.215                     # 고리 바깥 반지름
+    rt = max(int(size * 0.105), 2)       # 고리 두께 (사선과 비슷하게)
+    head = size * 0.26                   # 화살촉 크기
+    off = 0.50                           # 중심에서 고리까지 (작을수록 사선에 밀착)
+
+    x0, y0 = cx - a, cy + a              # 왼쪽 아래에서
+    x1, y1 = cx + a, cy - a              # 오른쪽 위로
+    ang = math.atan2(y1 - y0, x1 - x0)
+    # 화살촉이 얹힐 만큼 사선을 조금 줄인다
+    ex, ey = x1 - math.cos(ang) * head * 0.52, y1 - math.sin(ang) * head * 0.52
+    d.line([(x0, y0), (ex, ey)], fill=arrow_color, width=t)
+    d.polygon([(x1, y1),
+               (x1 + math.cos(ang + 2.45) * head, y1 + math.sin(ang + 2.45) * head),
+               (x1 + math.cos(ang - 2.45) * head, y1 + math.sin(ang - 2.45) * head)],
+              fill=arrow_color)
+
+    # 고리 둘 — 왼쪽 위, 오른쪽 아래
+    for sx, sy in ((-1, -1), (1, 1)):
+        gx, gy = cx + sx * a * off, cy + sy * a * off
+        d.ellipse([gx - r, gy - r, gx + r, gy + r], outline=ring_color, width=rt)
+
+
+
 def _draw_screen(d: ImageDraw.ImageDraw, sx0: int, sy0: int, sx1: int, sy1: int,
                  style: str) -> None:
     """화면 내용: 상승 화살표와 % 만 쓴다 (숫자 없음).
 
-    32px 에서도 알아봐야 하므로 요소를 둘로 제한하고 각각 크게 그린다.
+    32px 에서도 알아봐야 하므로 요소를 최소로 두고 크게 그린다.
     """
     w, h = sx1 - sx0, sy1 - sy0
-    cy = (sy0 + sy1) // 2
+    cx, cy = (sx0 + sx1) // 2, (sy0 + sy1) // 2
 
-    if style == "side":
-        # 왼쪽 화살표 · 오른쪽 % — 요소가 겹치지 않아 작은 크기에서 가장 또렷하다.
-        # 꺾은선을 2단으로 줄이고 상승 각도를 키워 '오른다'가 한눈에 읽히게 한다.
+    if style == "glyph":
+        # % 의 사선 자체가 화살표 — 기호 하나로 '퍼센트'와 '상승'을 같이 말한다
+        _pct_arrow(d, cx, cy, int(min(w, h) * 0.86), AMBER + (255,), BLUE + (255,))
+
+    elif style == "side":
+        # 왼쪽 화살표 · 오른쪽 % — 요소가 겹치지 않아 작은 크기에서도 또렷하다
         ax0, ax1 = sx0 + int(w * 0.13), sx0 + int(w * 0.52)
         pts = [(ax0, cy + int(h * 0.22)),
                (ax0 + (ax1 - ax0) * 0.48, cy + int(h * 0.01)),
@@ -98,12 +137,13 @@ def _draw_screen(d: ImageDraw.ImageDraw, sx0: int, sy0: int, sx1: int, sy1: int,
         bb = f.getbbox("%")
         d.text((sx0 + int(w * 0.68) - bb[0], cy - (bb[3] - bb[1]) // 2 - bb[1]),
                "%", font=f, fill=AMBER + (255,))
+
     else:
         # % 를 크게 두고 화살표가 그 위를 가로질러 오른다
         f = _fit_font(FONT_BLACK, "%", int(w * 0.52), int(h * 0.74))
         bb = f.getbbox("%")
-        d.text(((sx0 + sx1) // 2 - (bb[2] - bb[0]) // 2 - bb[0],
-                cy - (bb[3] - bb[1]) // 2 - bb[1]), "%", font=f, fill=AMBER + (255,))
+        d.text((cx - (bb[2] - bb[0]) // 2 - bb[0], cy - (bb[3] - bb[1]) // 2 - bb[1]),
+               "%", font=f, fill=AMBER + (255,))
         pts = [(sx0 + int(w * 0.08), sy1 - int(h * 0.18)),
                (sx0 + int(w * 0.38), sy1 - int(h * 0.34)),
                (sx0 + int(w * 0.62), sy1 - int(h * 0.30)),
@@ -111,7 +151,7 @@ def _draw_screen(d: ImageDraw.ImageDraw, sx0: int, sy0: int, sx1: int, sy1: int,
         _arrow(d, pts, BLUE + (255,), 30, 52)
 
 
-def build(style: str = "side") -> Image.Image:
+def build(style: str = "glyph") -> Image.Image:
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
 
     # --- 배경: macOS 스타일 둥근 사각형 ---
@@ -172,8 +212,8 @@ def build(style: str = "side") -> Image.Image:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--style", default="side", choices=["side", "over"],
-                    help="side=화살표|%% 나란히, over=%% 위로 화살표가 지나감")
+    ap.add_argument("--style", default="glyph", choices=["glyph", "side", "over"],
+                    help="glyph=%% 사선이 화살표(기본), side=나란히, over=겹침")
     ap.add_argument("--preview", action="store_true", help="512 미리보기만 저장")
     args = ap.parse_args()
 
