@@ -17,3 +17,8 @@ data/events_candidates.csv
 # 시트 ID — 이것만 있으면 원본을 통째로 받을 수 있다
 data/sheet_id.txt
 .streamlit/secrets.toml
+
+# 아이콘 중간 산출물 (assets/icon_1024.png, AppIcon.icns 는 커밋)
+assets/AppIcon.iconset/
+assets/icon_preview.png
+assets/icon_sizes.png
