@@ -1,6 +1,7 @@
-"""바탕화면 런처 아이콘 생성 — TV 수상기 화면에 시청률 %.
+"""바탕화면 런처 아이콘 생성 — TV 수상기 화면에 상승 화살표와 %.
 
-  .venv/bin/python scripts/make_icon.py            # PNG + icns 생성
+  .venv/bin/python scripts/make_icon.py                 # PNG + icns 생성
+  .venv/bin/python scripts/make_icon.py --style over    # 배치 바꾸기
   .venv/bin/python scripts/make_icon.py --preview  # 미리보기 PNG 만 (512)
 
 macOS 아이콘은 32px 에서도 알아봐야 하므로, 형태(수상기 실루엣)와
@@ -63,7 +64,54 @@ def _fit_font(path: str, text: str, target_w: int, target_h: int) -> ImageFont.F
     return best
 
 
-def build(value: str = "3.2") -> Image.Image:
+
+def _arrow(d: ImageDraw.ImageDraw, pts, color, width: int, head: int) -> None:
+    """상승 꺾은선 + 끝에 화살촉. 예보 느낌을 주면서 '오른다'가 바로 읽힌다."""
+    d.line(pts, fill=color, width=width, joint="curve")
+    (x0, y0), (x1, y1) = pts[-2], pts[-1]
+    import math
+    ang = math.atan2(y1 - y0, x1 - x0)
+    tip = (x1 + math.cos(ang) * head * 0.42, y1 + math.sin(ang) * head * 0.42)
+    left = (x1 + math.cos(ang + 2.5) * head, y1 + math.sin(ang + 2.5) * head)
+    right = (x1 + math.cos(ang - 2.5) * head, y1 + math.sin(ang - 2.5) * head)
+    d.polygon([tip, left, right], fill=color)
+
+
+def _draw_screen(d: ImageDraw.ImageDraw, sx0: int, sy0: int, sx1: int, sy1: int,
+                 style: str) -> None:
+    """화면 내용: 상승 화살표와 % 만 쓴다 (숫자 없음).
+
+    32px 에서도 알아봐야 하므로 요소를 둘로 제한하고 각각 크게 그린다.
+    """
+    w, h = sx1 - sx0, sy1 - sy0
+    cy = (sy0 + sy1) // 2
+
+    if style == "side":
+        # 왼쪽 화살표 · 오른쪽 % — 요소가 겹치지 않아 작은 크기에서 가장 또렷하다.
+        # 꺾은선을 2단으로 줄이고 상승 각도를 키워 '오른다'가 한눈에 읽히게 한다.
+        ax0, ax1 = sx0 + int(w * 0.13), sx0 + int(w * 0.52)
+        pts = [(ax0, cy + int(h * 0.22)),
+               (ax0 + (ax1 - ax0) * 0.48, cy + int(h * 0.01)),
+               (ax1, cy - int(h * 0.24))]
+        _arrow(d, pts, BLUE + (255,), 32, 56)
+        f = _fit_font(FONT_BLACK, "%", int(w * 0.32), int(h * 0.56))
+        bb = f.getbbox("%")
+        d.text((sx0 + int(w * 0.68) - bb[0], cy - (bb[3] - bb[1]) // 2 - bb[1]),
+               "%", font=f, fill=AMBER + (255,))
+    else:
+        # % 를 크게 두고 화살표가 그 위를 가로질러 오른다
+        f = _fit_font(FONT_BLACK, "%", int(w * 0.52), int(h * 0.74))
+        bb = f.getbbox("%")
+        d.text(((sx0 + sx1) // 2 - (bb[2] - bb[0]) // 2 - bb[0],
+                cy - (bb[3] - bb[1]) // 2 - bb[1]), "%", font=f, fill=AMBER + (255,))
+        pts = [(sx0 + int(w * 0.08), sy1 - int(h * 0.18)),
+               (sx0 + int(w * 0.38), sy1 - int(h * 0.34)),
+               (sx0 + int(w * 0.62), sy1 - int(h * 0.30)),
+               (sx1 - int(w * 0.08), sy0 + int(h * 0.16))]
+        _arrow(d, pts, BLUE + (255,), 30, 52)
+
+
+def build(style: str = "side") -> Image.Image:
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
 
     # --- 배경: macOS 스타일 둥근 사각형 ---
@@ -101,27 +149,7 @@ def build(value: str = "3.2") -> Image.Image:
                         fill=(96, 101, 122, 255))          # 베젤 안쪽 그림자
     d.rounded_rectangle([sx0, sy0, sx1, sy1], radius=48, fill=SCREEN + (255,))
 
-    # 숫자는 위, 상승선은 아래 — 겹치면 둘 다 안 읽힌다
-    num_f = _fit_font(FONT_BLACK, value, 336, 172)
-    pct_f = ImageFont.truetype(FONT_BLACK, int(num_f.size * 0.62))
-    nb, pb = num_f.getbbox(value), pct_f.getbbox("%")
-    gap = 20
-    total_w = (nb[2] - nb[0]) + gap + (pb[2] - pb[0])
-    cx = (sx0 + sx1) // 2
-    top_y = sy0 + 76
-    nx = cx - total_w // 2
-    d.text((nx - nb[0], top_y - nb[1]), value, font=num_f, fill=AMBER + (255,))
-    d.text((nx + (nb[2] - nb[0]) + gap - pb[0],
-            top_y + (nb[3] - nb[1]) - (pb[3] - pb[1]) - pb[1]),
-           "%", font=pct_f, fill=AMBER + (255,))
-
-    # 상승선(예측 느낌)은 화면 아래쪽 띠에만 둔다
-    ly0, ly1 = sy1 - 118, sy1 - 40
-    pts = [(sx0 + 60, ly1), (sx0 + 190, ly1 - 28), (sx0 + 318, ly1 - 14),
-           (sx0 + 446, ly0 + 18), (sx1 - 60, ly0)]
-    d.line(pts, fill=BLUE + (235,), width=16, joint="curve")
-    for q in pts:
-        d.ellipse([q[0] - 12, q[1] - 12, q[0] + 12, q[1] + 12], fill=BLUE + (255,))
+    _draw_screen(d, sx0, sy0, sx1, sy1, style)
 
     # 화면 광택 (왼쪽 위에서 비스듬히)
     gloss = Image.new("RGBA", (S, S), (0, 0, 0, 0))
@@ -144,12 +172,13 @@ def build(value: str = "3.2") -> Image.Image:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--value", default="3.2", help="화면에 띄울 시청률 숫자")
+    ap.add_argument("--style", default="side", choices=["side", "over"],
+                    help="side=화살표|%% 나란히, over=%% 위로 화살표가 지나감")
     ap.add_argument("--preview", action="store_true", help="512 미리보기만 저장")
     args = ap.parse_args()
 
     OUT_PNG.parent.mkdir(parents=True, exist_ok=True)
-    img = build(args.value)
+    img = build(args.style)
     img.save(OUT_PNG)
     print(f"PNG: {OUT_PNG}")
 
