@@ -21,7 +21,17 @@ OUT_PNG = ROOT / "assets" / "icon_1024.png"
 OUT_ICNS = ROOT / "assets" / "AppIcon.icns"
 
 S = 1024                                   # 마스터 크기
-BG_TOP, BG_BOT = (22, 26, 46), (9, 11, 22)         # 배경 그라디언트 (짙은 남색)
+
+# 배경 프리셋: (그라디언트 위, 아래, 안테나 색)
+# 어두운 바탕화면에서 아이콘 경계가 묻히지 않도록 밝은 배경을 기본으로 둔다.
+# 배경이 밝으면 은색 안테나가 사라지므로 안테나 색도 함께 바꾼다.
+BG_PRESETS = {
+    "amber": ((255, 186, 74), (237, 124, 26), (92, 56, 12)),
+    "white": ((250, 250, 253), (219, 224, 235), (88, 95, 116)),
+    "blue":  ((118, 176, 252), (37, 99, 235), (232, 239, 253)),
+    "navy":  ((22, 26, 46), (9, 11, 22), (196, 203, 222)),   # 기존(어두움)
+}
+BG_TOP, BG_BOT, ANTENNA = BG_PRESETS["amber"]
 BODY_TOP, BODY_BOT = (216, 220, 232), (150, 157, 178)   # 수상기 본체 (은색)
 SCREEN = (13, 16, 32)                                    # 화면 바탕
 AMBER = (255, 196, 75)                                   # 화면 숫자 (앰버 CRT)
@@ -166,9 +176,9 @@ def build(style: str = "glyph") -> Image.Image:
     # --- 안테나: 본체보다 먼저 그려 뒤로 보내기 ---
     ax, ay = S // 2, 300
     for dx in (-190, 190):
-        d.line([(ax, ay), (ax + dx, 108)], fill=(196, 203, 222, 255), width=17)
+        d.line([(ax, ay), (ax + dx, 108)], fill=ANTENNA + (255,), width=17)
         d.ellipse([ax + dx - 21, 108 - 21, ax + dx + 21, 108 + 21],
-                  fill=(226, 231, 244, 255))
+                  fill=ANTENNA + (255,))
 
     # --- 수상기 본체 ---
     bx0, by0, bx1, by1 = 128, 286, 896, 806
@@ -219,12 +229,15 @@ def main() -> None:
     ap.add_argument("--color", default="blue",
                     choices=["amber", "blue", "white", "green"],
                     help="합성 기호 색 (style=glyph 일 때)")
+    ap.add_argument("--bg", default="amber", choices=list(BG_PRESETS),
+                    help="배경색 (어두운 바탕화면과 구분되도록 기본은 amber)")
     ap.add_argument("--preview", action="store_true", help="512 미리보기만 저장")
     args = ap.parse_args()
 
-    global MARK
+    global MARK, BG_TOP, BG_BOT, ANTENNA
     MARK = {"amber": AMBER, "blue": BLUE,
             "white": (238, 242, 252), "green": (74, 222, 128)}[args.color]
+    BG_TOP, BG_BOT, ANTENNA = BG_PRESETS[args.bg]
 
     OUT_PNG.parent.mkdir(parents=True, exist_ok=True)
     img = build(args.style)
