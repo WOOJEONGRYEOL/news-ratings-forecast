@@ -158,7 +158,7 @@ def build(style: str = "glyph") -> Image.Image:
 
     # --- 배경: macOS 스타일 둥근 사각형 ---
     bg = _vgrad((S, S), BG_TOP, BG_BOT).convert("RGBA")
-    bg.putalpha(_rounded_mask((S, S), 230))
+    bg.putalpha(_rounded_mask((S, S), 200))   # 바탕화면 런처 공통 모서리 반경
     img.alpha_composite(bg)
 
     d = ImageDraw.Draw(img, "RGBA")
