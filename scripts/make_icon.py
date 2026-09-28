@@ -26,6 +26,7 @@ BODY_TOP, BODY_BOT = (216, 220, 232), (150, 157, 178)   # 수상기 본체 (은�
 SCREEN = (13, 16, 32)                                    # 화면 바탕
 AMBER = (255, 196, 75)                                   # 화면 숫자 (앰버 CRT)
 BLUE = (96, 165, 250)                                    # 상승선
+MARK = AMBER                                             # 합성 기호 단색 (--color 로 변경)
 
 FONT_BLACK = "/System/Library/Fonts/Supplemental/Arial Black.ttf"
 FONT_BOLD = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
@@ -124,7 +125,8 @@ def _draw_screen(d: ImageDraw.ImageDraw, sx0: int, sy0: int, sx1: int, sy1: int,
 
     if style == "glyph":
         # % 의 사선 자체가 화살표 — 기호 하나로 '퍼센트'와 '상승'을 같이 말한다
-        _pct_arrow(d, cx, cy, int(min(w, h) * 0.86), AMBER + (255,), BLUE + (255,))
+        c = MARK + (255,)
+        _pct_arrow(d, cx, cy, int(min(w, h) * 0.86), c, c)
 
     elif style == "side":
         # 왼쪽 화살표 · 오른쪽 % — 요소가 겹치지 않아 작은 크기에서도 또렷하다
@@ -214,8 +216,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--style", default="glyph", choices=["glyph", "side", "over"],
                     help="glyph=%% 사선이 화살표(기본), side=나란히, over=겹침")
+    ap.add_argument("--color", default="amber",
+                    choices=["amber", "blue", "white", "green"],
+                    help="합성 기호 색 (style=glyph 일 때)")
     ap.add_argument("--preview", action="store_true", help="512 미리보기만 저장")
     args = ap.parse_args()
+
+    global MARK
+    MARK = {"amber": AMBER, "blue": BLUE,
+            "white": (238, 242, 252), "green": (74, 222, 128)}[args.color]
 
     OUT_PNG.parent.mkdir(parents=True, exist_ok=True)
     img = build(args.style)
